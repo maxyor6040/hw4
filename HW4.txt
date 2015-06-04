@@ -1,0 +1,34 @@
+~~~if TODO is done set [-] to [+]~~~
+========================================
+file_operations:
+----------------------------------------
+1.open
+	if(first player on dev) <=> games[current minor]==NULL
+	[-]allocate Matrix and initialize all other values in game struct
+	[-]set player color (first is white)
+	[-]
+	[-]block (go to sleep and wait for second player)
+	else if(second player on dev)
+	[-]set player color (first is white)
+2.release
+3.flush
+4.read
+5.write
+6.llseek
+7.ioctl
+8.owner=THIS_MODULE
+----------------------------------------
+module attributes
+----------------------------------------
+[-]games[256] - array of pointers to struct game
+[-]int num_of_games
+----------------------------------------
+struct game
+----------------------------------------
+[-]game board matrix
+[-]semaphores
+----------------------------------------
+init_module
+----------------------------------------
+[-]initialize games[256] values in a loop to NULL
+[-]register char device
