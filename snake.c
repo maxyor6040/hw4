@@ -41,15 +41,21 @@ struct file_operations my_fops = {
 typedef struct semaphore Mutex;
 typedef struct semaphore Semaphore;
 
-typedef struct struct_game_t {
+typedef struct game_t {
     Matrix Game;
     Semaphore check_open_only_twice;
-    Mutex catch_turn;
-    Mutex someone_left;
+    Semaphore catch_turn;
+    Semaphore someone_left;
     int did_game_start; //TODO: use this instead of NULL in game matrix or not?
-} struct_game;
+} game;
 
-struct_game Games[256];
+typedef struct privateGameData_t {
+    game* myGame;
+    int color;
+} privateGameData;
+
+
+game Games[256];
 
 int init_module( void ) {
     my_major = register_chrdev( my_major, "SNAKE GAME", &my_fops );
@@ -64,9 +70,9 @@ int init_module( void ) {
     }
 
     for (int i=0; i< 256; ++i) {
-        sema_init(&Games[i].check_open_only_twice, 2);
-        init_MUTEX(&Games[i].catch_turn);
-        init_MUTEX(&Games[i].someone_left);
+        sema_init(&Games[i].check_open_only_twice, 1);
+        sema_init(&Games[i].catch_turn, 0);
+        sema_init(&Games[i].someone_left, 1);
         Games[i].did_game_start = FALSE;
     }
 
@@ -85,21 +91,40 @@ void cleanup_module( void ) {
 int my_open( struct inode *inode, struct file *filp ) {
 
     int i = MINOR( inode->i_rdev );
-
+    privateGameData* PGD;
     if ( Games[i].did_game_start == TRUE ) { //TODO: MAKE SURE WE ARE NOT IN A RACE CONDITION!!!
+        if(down_trylock(Games[i].check_open_only_twice)==0){//black player
+            PGD = kmalloc(sizeof(*privateGameData));
+            PGD->myGame = Games+i;
+            PGD->color = BLACK;
 
+            filp->private_data = (void*)PGD;
+            up(PGD->myGame->catch_turn);
+            down(PGD->myGame->catch_turn);
+        }
+        else{//should not enter. already two players
+            //TODO: return error
+        }
     }
-    filp->private_data = allocate_private_data();
+    else{
+        //this is white player
+        PGD = kmalloc(sizeof(*privateGameData));
+        PGD->myGame = Games+i;
+        PGD->color = WHITE;
 
-    if( filp->f_mode & FMODE_READ )
-        //handle read opening
-    if( filp->f_mode & FMODE_WRITE )
-        //handle write opening
+        filp->private_data = (void*)PGD;
+        down(PGD->myGame->catch_turn);
+        /*region no need
+        if( filp->f_mode & FMODE_READ )
+            //handle read opening
+        if( filp->f_mode & FMODE_WRITE )
+            //handle write opening
 
-    if( filp->f_flags & O_NONBLOCK ) {
-        //example of additional flag
+        if( filp->f_flags & O_NONBLOCK ) {
+            //example of additional flag
+        }
+        */
     }
-
     return 0;
 }
 
