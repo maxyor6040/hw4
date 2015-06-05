@@ -5,12 +5,18 @@ file_operations:
 1.open
 	if(first player on dev) <=> games[current minor]==NULL
 	[-]allocate Matrix and initialize all other values in game struct
+	[-]semaphore check_open_only_twice initialized to 1
 	[-]set player color (first is white)
 	[-]
 	[-]block (go to sleep and wait for second player)
-	else if(second player on dev)
-	[-]set player color (first is white)
+	else if(second player on dev) <=> check_open_only_twice try wait succeed
+	[-]set player color (second is black)
+	[-]wake up first player (post catch_turn)
+	[-]wait for catch_turn
+	else <=> check_open_only_twice try wait failed
+	[-]error
 2.release
+	[-]
 3.flush
 4.read
 5.write
@@ -26,7 +32,9 @@ module attributes
 struct game
 ----------------------------------------
 [-]game board matrix
-[-]semaphores
+[-]semaphore check_open_only_twice
+[-]semaphore catch_turn
+[-]semaphore someone_left
 ----------------------------------------
 init_module
 ----------------------------------------
