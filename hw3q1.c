@@ -1,10 +1,10 @@
 /*-------------------------------------------------------------------------
 Include files:
 --------------------------------------------------------------------------*/
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-
+//#include <stdio.h>
+//#include <stdlib.h>
+//#include <time.h>
+#include <asm/ioctl.h> //CHANGE
 /*=========================================================================
 Constants and definitions:
 ==========================================================================*/
@@ -75,7 +75,7 @@ int main()
 
 	if (!Init(&matrix))
 	{
-		printf("Illegal M, N parameters.");
+		//TODO: handle printf("Illegal M, N parameters.");
 		return -1;
 	}
 	while (Update(&matrix, player))
@@ -88,7 +88,7 @@ int main()
 	return 0;
 }
 
-bool Init(Matrix *matrix)
+bool Init(Matrix *matrix, int minor)
 {
 	int i;
 	/* initialize the snakes location */
@@ -98,40 +98,40 @@ bool Init(Matrix *matrix)
 		(*matrix)[N - 1][i] = BLACK * (i + 1);
 	}
 	/* initialize the food location */
-	srand(time(0));
-	if (RandFoodLocation(matrix) != ERR_OK)
+	//CHANGE not needed srand(time(0));
+	if (RandFoodLocation(matrix, minor) != ERR_OK)
 		return FALSE;
-	printf("instructions: white player is represented by positive numbers, \nblack player is represented by negative numbers\n");
+	//TODO: handle printf("instructions: white player is represented by positive numbers, \nblack player is represented by negative numbers\n");
 	Print(matrix);
 
 	return TRUE;
 }
 
-bool Update(Matrix *matrix, Player player)
+bool Update(Matrix *matrix, Player player, int minor)
 {
 	ErrorCode e;
 	Point p = GetInputLoc(matrix, player);
 
 	if (!CheckTarget(matrix, player, p))
 	{
-		printf("% d lost.", player);
+		//TODO: handle printf("% d lost.", player);
 		return FALSE;
 	}
-	e = CheckFoodAndMove(matrix, player, p);
+	e = CheckFoodAndMove(matrix, player, p, minor);
 	if (e == ERR_BOARD_FULL)
 	{
-		printf("the board is full, tie");
+		//TODO: handle printf("the board is full, tie");
 		return FALSE;
 	}
 	if (e == ERR_SNAKE_IS_TOO_HUNGRY)
 	{
-		printf("% d lost. the snake is too hungry", player);
+		//TODO: handle printf("% d lost. the snake is too hungry", player);
 		return FALSE;
 	}
 	// only option is that e == ERR_OK
 	if (IsMatrixFull(matrix))
 	{
-		printf("the board is full, tie");
+		//TODO: handle printf("the board is full, tie");
 		return FALSE;
 	}
 
@@ -140,20 +140,20 @@ bool Update(Matrix *matrix, Player player)
 
 Point GetInputLoc(Matrix *matrix, Player player)
 {
-	Direction dir;
+	Direction dir = 0; //TODO: make sure that the fact I initialized it doesn't fuck shit up
 	Point p;
 
-	printf("% d, please enter your move(DOWN2, LEFT4, RIGHT6, UP8):\n", player);
+	//TODO: handle printf("% d, please enter your move(DOWN2, LEFT4, RIGHT6, UP8):\n", player);
 	do
 	{
-		if (scanf("%d", &dir) < 0)
+		if (/* //TODO: handle scanf("%d", &dir) <*/ 0)
 		{
-			printf("an error occurred, the program will now exit.\n");
-			exit(1);
+			//TODO: handle printf("an error occurred, the program will now exit.\n");
+			//TODO: handle exit(1);
 		}
 		if (dir != UP   && dir != DOWN && dir != LEFT && dir != RIGHT)
 		{
-			printf("invalid input, please try again\n");
+			//TODO: handle printf("invalid input, please try again\n");
 		}
 		else
 		{
@@ -223,7 +223,7 @@ bool IsAvailable(Matrix *matrix, Point p)
 		((*matrix)[p.y][p.x] != EMPTY && (*matrix)[p.y][p.x] != FOOD));
 }
 
-ErrorCode CheckFoodAndMove(Matrix *matrix, Player player, Point p)
+ErrorCode CheckFoodAndMove(Matrix *matrix, Player player, Point p, int minor)
 {
 	static int white_counter = K;
 	static int black_counter = K;
@@ -235,7 +235,7 @@ ErrorCode CheckFoodAndMove(Matrix *matrix, Player player, Point p)
 
 		IncSizePlayer(matrix, player, p);
 
-		if (RandFoodLocation(matrix) != ERR_OK)
+		if (RandFoodLocation(matrix, minor) != ERR_OK)
 			return ERR_BOARD_FULL;
 	}
 	else /* check hunger */
@@ -283,13 +283,15 @@ void IncSizePlayer(Matrix *matrix, Player player, Point p)
 	(*matrix)[p.y][p.x] = player;
 }
 
-ErrorCode RandFoodLocation(Matrix *matrix)
+ErrorCode RandFoodLocation(Matrix *matrix, int minor)
 {
 	Point p;
+	int i=0;
 	do
 	{
-		p.x = rand() % N;
-		p.y = rand() % N;
+		p.x = _IO(minor,i) % N;
+		p.y = _IO(minor, N*i + 2) % N;
+		++i;
 	} while (!IsAvailable(matrix, p) || IsMatrixFull(matrix));
 
 	if (IsMatrixFull(matrix))
@@ -318,23 +320,25 @@ void Print(Matrix *matrix)
 	int i;
 	Point p;
 	for (i = 0; i < N + 1; ++i)
-		printf("---");
-	printf("\n");
+		//TODO: handle printf("---");
+		//TODO: handle ("\n");
 	for (p.y = 0; p.y < N; ++p.y)
 	{
-		printf("|");
+		//TODO: handle printf("|");
 		for (p.x = 0; p.x < N; ++p.x)
 		{
 			switch ((*matrix)[p.y][p.x])
 			{
-			case FOOD:  printf("  *"); break;
-			case EMPTY: printf("  ."); break;
-			default:    printf("% 3d", (*matrix)[p.y][p.x]);
+			case FOOD:  //TODO: handle printf("  *"); break;
+			case EMPTY: //TODO: handle printf("  ."); break;
+			default:    //TODO: handle ("% 3d", (*matrix)[p.y][p.x])
+			;
 			}
 		}
-		printf(" |\n");
+		//TODO: handle printf(" |\n");
 	}
 	for (i = 0; i < N + 1; ++i)
-		printf("---");
-	printf("\n");
+		//TODO: handle printf("---")
+		;
+	//TODO: handle printf("\n");
 }

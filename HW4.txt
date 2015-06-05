@@ -4,21 +4,24 @@ file_operations:
 ----------------------------------------
 1.open
 	if(first player on dev) <=> games[current minor]==NULL
-	[-]allocate Matrix and initialize all other values in game struct
-	[-]semaphore check_open_only_twice initialized to 1
-	[-]set player color (first is white)
-	[-]
-	[-]block (go to sleep and wait for second player)
+	[+]allocate Matrix and initialize all other values in game struct
+	[+]semaphore check_open_only_twice initialized to 1
+	[+]set player color (first is white)
+	[+]
+	[+]block (go to sleep and wait for second player)
 	else if(second player on dev) <=> check_open_only_twice try wait succeed
-	[-]set player color (second is black)
-	[-]wake up first player (post catch_turn)
-	[-]wait for catch_turn
+	[+]set player color (second is black)
+	[+]wake up first player (post catch_turn)
+	[+]wait for catch_turn
 	else <=> check_open_only_twice try wait failed
 	[-]error
 2.release
-	[-]
-3.flush
+	[-]set someone_left to TRUE
+	[-]free allocated memory
+	[-]wake up second player
+3.flush (?)
 4.read
+	[-]
 5.write
 6.llseek
 7.ioctl
@@ -31,12 +34,87 @@ module attributes
 ----------------------------------------
 struct game
 ----------------------------------------
-[-]game board matrix
-[-]semaphore check_open_only_twice
-[-]semaphore catch_turn
-[-]semaphore someone_left
+[+]game board matrix
+[+]semaphore check_open_only_twice
+[+]semaphore catch_turn
+[+]bool someone_left
+----------------------------------------
+struct private game data (PGD)
+----------------------------------------
+[+]game struct
+[+]color
 ----------------------------------------
 init_module
 ----------------------------------------
-[-]initialize games[256] values in a loop to NULL
-[-]register char device
+[+]initialize games[256] values in a loop
+[+]register char device
+
+
+***********************************************************************************************************
+
+***********************************************************************************************************
+
+***********************************************************************************************************
+
+***********************************************************************************************************
+
+***********************************************************************************************************
+
+
+~~~if TODO is done set [-] to [+]~~~
+========================================
+file_operations:
+----------------------------------------
+1.open
+	if first player
+	[+]call Init (original game)
+	[+]color is white
+	[+]set private data
+	[+]wait for second player to come
+	[+]raise whiteMoves to be able to make the first move
+	else if second player
+	[+]color is black
+	[+]set private data
+	[+]wake up first player
+	else
+	[-]error
+2.release
+	[-]someone left = TRUE
+	[-]up both players' semaphore
+3.flush (?)
+4.read
+5.write
+	[-]if
+6.llseek
+7.ioctl
+8.owner=THIS_MODULE
+----------------------------------------
+module attributes
+----------------------------------------
+
+----------------------------------------
+struct game
+----------------------------------------
+	[-]globalLock mutex
+	[+]whiteMoves semaphore
+	[+]blackMoves semaphore
+	[+]board Matrix
+	[+]bool someoneLeft
+	[+]int countOpens
+----------------------------------------
+struct private game data (PGD)
+----------------------------------------
+	[-]game struct
+	[-]color
+----------------------------------------
+init_module
+----------------------------------------
+[+]initialize games[256] values in a loop
+[+]register char device
+
+
+----------------------------------------
+if (someoneLeft)
+[-]post rival
+[-]return error
+----------------------------------------
