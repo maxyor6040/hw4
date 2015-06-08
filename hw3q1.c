@@ -21,6 +21,7 @@ black snake is -1  -2  -3 */
 #define WHITE ( 1) /* id to the white player */
 #define BLACK (-1) /* id to the black player */
 #define EMPTY ( 0) /* to describe an empty point */
+#define TIE   ( 5) /* to describe an empty point */
 /* to describe a point with food. having the value this big guarantees that there will be no
 overlapping between the snake segments' numbers and the food id */
 #define FOOD  (N*N)
@@ -70,7 +71,7 @@ The main program. The program implements a snake game
 -------------------------------------------------------------------------*/
 int main()
 {
-	Player player = WHITE;
+	/*Player player = WHITE;
 	Matrix matrix = { { EMPTY } };
 
 	if (!Init(&matrix))
@@ -80,15 +81,15 @@ int main()
 	}
 	while (Update(&matrix, player))
 	{
-		Print(&matrix);
-		/* switch turns */
+		//Print(&matrix);
+		// switch turns
 		player = -player;
-	}
+	}*/
 
 	return 0;
 }
 
-bool Init(Matrix *matrix, int minor)
+bool Init(Matrix *matrix)
 {
 	int i;
 	/* initialize the snakes location */
@@ -99,67 +100,49 @@ bool Init(Matrix *matrix, int minor)
 	}
 	/* initialize the food location */
 	//CHANGE not needed srand(time(0));
-	if (RandFoodLocation(matrix, minor) != ERR_OK)
+	if (RandFoodLocation(matrix) != ERR_OK)
 		return FALSE;
 	//TODO: handle printf("instructions: white player is represented by positive numbers, \nblack player is represented by negative numbers\n");
-	Print(matrix);
+	//Print(matrix); //we dont print without "read"
 
 	return TRUE;
 }
 
-bool Update(Matrix *matrix, Player player, int minor)
+bool Update(Matrix *matrix, Player player, privateGameData* PGD, char move)
 {
 	ErrorCode e;
-	Point p = GetInputLoc(matrix, player);
+	Point p = GetInputLoc(matrix, player, move);
 
 	if (!CheckTarget(matrix, player, p))
 	{
-		//TODO: handle printf("% d lost.", player);
+		PGD->myGame->Winner =-player;
 		return FALSE;
 	}
-	e = CheckFoodAndMove(matrix, player, p, minor);
+	e = CheckFoodAndMove(matrix, player, p);
 	if (e == ERR_BOARD_FULL)
 	{
-		//TODO: handle printf("the board is full, tie");
+        PGD->myGame->Winner = TIE;
 		return FALSE;
 	}
 	if (e == ERR_SNAKE_IS_TOO_HUNGRY)
 	{
-		//TODO: handle printf("% d lost. the snake is too hungry", player);
+		PGD->myGame->Winner =-player;
 		return FALSE;
 	}
 	// only option is that e == ERR_OK
 	if (IsMatrixFull(matrix))
 	{
-		//TODO: handle printf("the board is full, tie");
+		PGD->myGame->Winner = TIE;
 		return FALSE;
 	}
 
 	return TRUE;
 }
 
-Point GetInputLoc(Matrix *matrix, Player player)
+Point GetInputLoc(Matrix *matrix, Player player, char move)
 {
-	Direction dir = 0; //TODO: make sure that the fact I initialized it doesn't fuck shit up
+	Direction dir = move-'0';
 	Point p;
-
-	//TODO: handle printf("% d, please enter your move(DOWN2, LEFT4, RIGHT6, UP8):\n", player);
-	do
-	{
-		if (/* //TODO: handle scanf("%d", &dir) <*/ 0)
-		{
-			//TODO: handle printf("an error occurred, the program will now exit.\n");
-			//TODO: handle exit(1);
-		}
-		if (dir != UP   && dir != DOWN && dir != LEFT && dir != RIGHT)
-		{
-			//TODO: handle printf("invalid input, please try again\n");
-		}
-		else
-		{
-			break;
-		}
-	} while (TRUE);
 
 	p = GetSegment(matrix, player);
 
@@ -223,7 +206,7 @@ bool IsAvailable(Matrix *matrix, Point p)
 		((*matrix)[p.y][p.x] != EMPTY && (*matrix)[p.y][p.x] != FOOD));
 }
 
-ErrorCode CheckFoodAndMove(Matrix *matrix, Player player, Point p, int minor)
+ErrorCode CheckFoodAndMove(Matrix *matrix, Player player, Point p)
 {
 	static int white_counter = K;
 	static int black_counter = K;
@@ -235,7 +218,7 @@ ErrorCode CheckFoodAndMove(Matrix *matrix, Player player, Point p, int minor)
 
 		IncSizePlayer(matrix, player, p);
 
-		if (RandFoodLocation(matrix, minor) != ERR_OK)
+		if (RandFoodLocation(matrix) != ERR_OK)
 			return ERR_BOARD_FULL;
 	}
 	else /* check hunger */
@@ -283,14 +266,14 @@ void IncSizePlayer(Matrix *matrix, Player player, Point p)
 	(*matrix)[p.y][p.x] = player;
 }
 
-ErrorCode RandFoodLocation(Matrix *matrix, int minor)
+ErrorCode RandFoodLocation(Matrix *matrix)
 {
 	Point p;
 	int i=0;
 	do
 	{
-		p.x = _IO(minor,i) % N;
-		p.y = _IO(minor, N*i + 2) % N;
+		p.x = get_random_bytes(&i, sizeof(int)) % N;
+		p.y = get_random_bytes(&i, sizeof(int)) % N;
 		++i;
 	} while (!IsAvailable(matrix, p) || IsMatrixFull(matrix));
 
@@ -315,30 +298,48 @@ bool IsMatrixFull(Matrix *matrix)
 	return TRUE;
 }
 
-void Print(Matrix *matrix)
-{
+void Print(Matrix *matrix, char *buf, int count) {
 	int i;
 	Point p;
 	for (i = 0; i < N + 1; ++i)
-		//TODO: handle printf("---");
-		//TODO: handle ("\n");
-	for (p.y = 0; p.y < N; ++p.y)
-	{
-		//TODO: handle printf("|");
-		for (p.x = 0; p.x < N; ++p.x)
-		{
-			switch ((*matrix)[p.y][p.x])
-			{
-			case FOOD:  //TODO: handle printf("  *"); break;
-			case EMPTY: //TODO: handle printf("  ."); break;
-			default:    //TODO: handle ("% 3d", (*matrix)[p.y][p.x])
-			;
+		my_printf("---", 3, buf, &count);
+	my_printf("\n", 1, buf, &count);
+	for (p.y = 0; p.y < N; ++p.y) {
+		my_printf("|", 1, buf, &count);
+		for (p.x = 0; p.x < N; ++p.x) {
+			switch ((*matrix)[p.y][p.x]) {
+				case FOOD:
+					my_printf("  *", 3, buf, &count);
+					break;
+				case EMPTY:
+					my_printf("  .", 3, buf, &count);
+					break;
+				default:
+					my_printf(((*matrix)[p.y][p.x]) / 100, 1, buf, &count);
+					my_printf((unsigned int) ((((*matrix)[p.y][p.x]) / 10) % 10), 1, buf, &count);
+					my_printf((unsigned int) ((*matrix)[p.y][p.x]) % 10, 1, buf, &count);
 			}
 		}
-		//TODO: handle printf(" |\n");
+		my_printf(" |\n", 3, buf, &count);
 	}
 	for (i = 0; i < N + 1; ++i)
-		//TODO: handle printf("---")
-		;
-	//TODO: handle printf("\n");
+		my_printf("---", 3, buf, &count);
+	my_printf("\n", 1, buf, &count);
+	/* DEAN CHANGES */
+	while (count > 0){
+		my_printf("\0", 1, buf, &count);
+	}
+	/* END OF DEAN CHANGES */
+}
+
+void my_printf(char* str, int strLen, char *buf, int* count){
+	int x;
+	if(*count<strLen) {
+		x = *count;
+		*count = 0;
+	}else{
+		x = strLen;
+		*count -= strLen;
+	}
+	copy_to_user((void*)buf,(void*)str, x);
 }

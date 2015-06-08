@@ -32,6 +32,7 @@ int init_module( void );
 void cleanup_module( void );
 int my_open( struct inode *inode, struct file *filp );
 int my_release( struct inode *inode, struct file *filp );
+int my_llseek(struct file *filp , loff_t loffT, int off);
 ssize_t my_read( struct file *filp, char *buf, size_t count, loff_t *f_pos );
 ssize_t my_write(struct file *filp, const char *buf, size_t count, loff_t *f_pos);
 ssize_t my_read2( struct file *filp, char *buf, size_t count, loff_t *f_pos );
@@ -43,7 +44,8 @@ struct file_operations my_fops = {
         .release=	my_release,
         .read=		my_read,
         .write=		my_write,
-        .llseek=		NULL,
+        .llseek=		my_llseek,
+        .flush=		NULL,
         .ioctl=		my_ioctl,
         .owner=		THIS_MODULE,
 };
@@ -57,6 +59,7 @@ typedef struct game_t {
     Semaphore blackMoves;
     int someoneLeft;
     int countOpens;
+    int Winner;
 } game;
 
 typedef struct privateGameData_t {
@@ -85,16 +88,15 @@ int init_module( void ) {
         sema_init(&Games[i].globalLock, 1);
         Games[i].someoneLeft = FALSE;
         Games[i].countOpens = 0;
+        Games[i].Winner = EMPTY;
     }
     return 0;
 }
-
 
 void cleanup_module( void ) {
     unregister_chrdev( my_major, "SNAKE GAME" );
     return;
 }
-
 
 int my_open( struct inode *inode, struct file *filp ) {
     int i = MINOR( inode->i_rdev );
@@ -124,33 +126,35 @@ int my_open( struct inode *inode, struct file *filp ) {
     return 0;
 }
 
-
 int my_release( struct inode *inode, struct file *filp ) {
     privateGameData* PGD = (privateGameData*)filp->private_data;
-    if(PGD==NULL){
-        //TODO: return error - already released this player
-        return 0;
-    }
     down(&PGD->myGame->globalLock);
-    if(PGD==NULL){
-        //TODO: return error - already released this player
-        return 0;
-    }
     PGD->myGame->someoneLeft = TRUE;
     up(&PGD->myGame->whiteMoves);
     up(&PGD->myGame->blackMoves);
-
-    filp->private_data = NULL;
-    
     up(&PGD->myGame->globalLock);
     kfree(filp->private_data);
     return 0;
-//TODO: remove all the private data. We will probably store there the minor, to know which game the user is playing in. + if he's black or white
-    return 0;
 }
 
+int my_llseek(struct file *filp , loff_t loffT, int off){
+ return -ENOSYS;
+}
 
 ssize_t my_read( struct file *filp, char *buf, size_t count, loff_t *f_pos ) {
+    privateGameData* PGD = (privateGameData*)filp->private_data;
+    down(&PGD->myGame->globalLock);
+    if (PGD->myGame->someoneLeft == TRUE || PGD->myGame->Winner!=0){
+        up(&PGD->myGame->whiteMoves);
+        up(&PGD->myGame->blackMoves);
+        up(&PGD->myGame->globalLock);
+        // TODO: returning appropriate error
+    }
+    /* DEAN CHANGES */
+    Print(&PGD->myGame->board,buf,count);
+    up(&PGD->myGame->globalLock);
+    /* END OF DEAN CHANGES */
+
     //read the data
     //copy the data to user
     //return the ammount of read data
@@ -159,26 +163,98 @@ ssize_t my_read( struct file *filp, char *buf, size_t count, loff_t *f_pos ) {
 
 
 ssize_t my_write(struct file *filp, const char *buf, size_t count, loff_t *f_pos) {
-    //copy the data from user
-    //write the data
-    // return the ammount of written data
+
+    privateGameData* PGD = (privateGameData*)filp->private_data;
+    if (PGD->color == WHITE){
+        down(&PGD->myGame->whiteMoves);
+    }
+    else if (PGD->color == BLACK){
+        down(&PGD->myGame->blackMoves);
+    }
+    down(&PGD->myGame->globalLock);
+    if (PGD->myGame->someoneLeft == TRUE || PGD->myGame->Winner!=0){
+        up(&PGD->myGame->whiteMoves);
+        up(&PGD->myGame->blackMoves);
+        up(&PGD->myGame->globalLock);
+        // TODO: return an appropriate error message
+    }
+    char move;
+    copy_from_user((void*)&move, (void*)buf, 1);
+    Direction dir = (int)(move - '0');
+    if (dir != UP   && dir != DOWN && dir != LEFT && dir != RIGHT)
+    {
+        PGD->myGame->Winner = -(PGD->color);
+        return 0;//TODO return error
+    }
+    Update(PGD->myGame->board, PGD->color, privateGameData* PGD, move);
+
+    if (PGD->color == WHITE){
+        up(&PGD->myGame->blackMoves);
+    }
+    else if (PGD->color == BLACK){
+        up(&PGD->myGame->whiteMoves);
+    }
+    up(&PGD->myGame->globalLock);
+
     return 0;//TODO: remove this and think
 }
 
 
 int my_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg) {
-
+    /* DEAN CHANGES */
+    privateGameData* PGD = (privateGameData*)filp->private_data;
+    down(&PGD->myGame->globalLock);
+    /* END OF DEAN CHANGES */
     switch( cmd ) {
         case SNAKE_GET_WINNER:
-            //handle SNAKE_GET_WINNER;
+            if (PGD->myGame->Winner == WHITE)
+            {
+                up(&PGD->myGame->globalLock);
+                return 4;
+            }
+            if (PGD->myGame->Winner == BLACK)
+            {
+                // if we got here it means that black player lost becuase "1" is the white player and he's stuck
+                up(&PGD->myGame->globalLock);
+                return 2;
+            }
+            if (PPGD->myGame->Winner == TIE)
+            {
+                up(&PGD->myGame->globalLock);
+                return 5;
+            }
+            else {
+                up(&PGD->myGame->globalLock);
+                return -1;
+            }
+            /* END OF DEAN CHANGES */
             break;
 
         case SNAKE_GET_COLOR:
             //handle SNAKE_GET_COLOR;
+            /* DEAN CHANGES */
+            if (PGD->color == WHITE){
+                up(&PGD->myGame->globalLock);
+                return 4;
+            }
+            if (PGD->color == BLACK){
+                up(&PGD->myGame->globalLock);
+                return 2;
+            }
+            else {
+                up(&PGD->myGame->globalLock);
+                return -1; // TODO: chose "-1" to represent an error (they said each negative number is fine)
+            }
+            /* END OF DEAN CHANGES */
             break;
 
-        default: return -ENOTTY;
+        default:
+            up(&PGD->myGame->globalLock);
+            return -ENOTTY;//TODO think about this
     }
+    /* DEAN CHANGES */
+    up(&PGD->myGame->globalLock); //TODO think about this
+    /* END OF DEAN CHANGES */
     return 0;
 }
 

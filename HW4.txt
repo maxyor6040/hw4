@@ -16,11 +16,11 @@ file_operations:
 	else
 	[-]error
 2.release
-    [-]get global lock
-	[-]someone left = TRUE
-	[-]up both players' semaphore
-    [-]release global lock
-3.[-]flush  --->null
+    [+]get global lock
+	[+]someone left = TRUE
+	[+]up both players' semaphore
+    [+]release global lock
+3.[+]flush  --->null
 4.read
     [-]get global lock
     [-]if(someone left)
@@ -46,7 +46,7 @@ file_operations:
     [-]release global lock
     [-]return error if occurred
 6.llseek
-    [-]return error
+    [+]return error
 7.ioctl
     [-]get global lock
     [-]return appropriate value (using given functions)
