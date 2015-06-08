@@ -3,69 +3,6 @@
 file_operations:
 ----------------------------------------
 1.open
-	if(first player on dev) <=> games[current minor]==NULL
-	[+]allocate Matrix and initialize all other values in game struct
-	[+]semaphore check_open_only_twice initialized to 1
-	[+]set player color (first is white)
-	[+]
-	[+]block (go to sleep and wait for second player)
-	else if(second player on dev) <=> check_open_only_twice try wait succeed
-	[+]set player color (second is black)
-	[+]wake up first player (post catch_turn)
-	[+]wait for catch_turn
-	else <=> check_open_only_twice try wait failed
-	[-]error
-2.release
-	[-]set someone_left to TRUE
-	[-]free allocated memory
-	[-]wake up second player
-3.flush (?)
-4.read
-	[-]
-5.write
-6.llseek
-7.ioctl
-8.owner=THIS_MODULE
-----------------------------------------
-module attributes
-----------------------------------------
-[-]games[256] - array of pointers to struct game
-[-]int num_of_games
-----------------------------------------
-struct game
-----------------------------------------
-[+]game board matrix
-[+]semaphore check_open_only_twice
-[+]semaphore catch_turn
-[+]bool someone_left
-----------------------------------------
-struct private game data (PGD)
-----------------------------------------
-[+]game struct
-[+]color
-----------------------------------------
-init_module
-----------------------------------------
-[+]initialize games[256] values in a loop
-[+]register char device
-
-
-***********************************************************************************************************
-
-***********************************************************************************************************
-
-***********************************************************************************************************
-
-***********************************************************************************************************
-
-***********************************************************************************************************
-
-
-~~~if TODO is done set [-] to [+]~~~
-========================================
-file_operations:
-----------------------------------------
-1.open
 	if first player
 	[+]call Init (original game)
 	[+]color is white
@@ -79,14 +16,41 @@ file_operations:
 	else
 	[-]error
 2.release
+    [-]get global lock
 	[-]someone left = TRUE
 	[-]up both players' semaphore
-3.flush (?)
+    [-]release global lock
+3.[-]flush  --->null
 4.read
+    [-]get global lock
+    [-]if(someone left)
+        [-]up both players' semaphore
+        [-]release global lock
+        [-]return error
+    [-]for(size of buffer) // maybe use his print
+        [-]if(less than N*N)
+            [-]write [i][i] (copy_to_user)
+        [-]else
+            [-]write '\0'
+    [-]release global lock
 5.write
-	[-]if
+    [-]down my color
+    [-]get global lock
+    [-]if(someone left)
+            [-]up both players' semaphore
+            [-]release global lock
+            [-]return error
+    [-]read char (copy_from_user) - make sure we read everything
+    [-]make move (using given functions)
+    [-]up second color
+    [-]release global lock
+    [-]return error if occurred
 6.llseek
+    [-]return error
 7.ioctl
+    [-]get global lock
+    [-]return appropriate value (using given functions)
+    [-]release global lock
 8.owner=THIS_MODULE
 ----------------------------------------
 module attributes
@@ -95,7 +59,7 @@ module attributes
 ----------------------------------------
 struct game
 ----------------------------------------
-	[-]globalLock mutex
+	[+]globalLock mutex
 	[+]whiteMoves semaphore
 	[+]blackMoves semaphore
 	[+]board Matrix
@@ -104,8 +68,8 @@ struct game
 ----------------------------------------
 struct private game data (PGD)
 ----------------------------------------
-	[-]game struct
-	[-]color
+	[+]game struct
+	[+]color
 ----------------------------------------
 init_module
 ----------------------------------------
@@ -115,6 +79,8 @@ init_module
 
 ----------------------------------------
 if (someoneLeft)
+in each function:
 [-]post rival
+[-]post self
 [-]return error
 ----------------------------------------

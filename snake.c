@@ -98,6 +98,7 @@ void cleanup_module( void ) {
 
 int my_open( struct inode *inode, struct file *filp ) {
     int i = MINOR( inode->i_rdev );
+    down(&(Games[i].globalLock));
     Games[i].countOpens++;
     privateGameData* PGD;
     if(Games[i].countOpens == 1){//WHITE player
@@ -106,15 +107,18 @@ int my_open( struct inode *inode, struct file *filp ) {
         PGD->myGame = Games+i;
         filp->private_data = (void*)PGD;
         Init(PGD->myGame->board, i);
+        up(&(Games[i].globalLock));
         down(&PGD->myGame->whiteMoves);
         up(&PGD->myGame->whiteMoves);
     }else if(Games[i].countOpens == 2){//BLACK player
+        up(&(Games[i].globalLock));
         privateGameData* PGD=kmalloc(sizeof(*PGD), GPF_KERNEL);
         PGD->color=BLACK;
         PGD->myGame = Games+i;
         filp->private_data = (void*)PGD;
         up(&PGD->myGame->whiteMoves);
     }else{//third or above entrence to my_open
+        up(&(Games[i].globalLock));
         //TODO: send error
     }
     return 0;
