@@ -1,0 +1,11 @@
+#!/bin/bash/
+
+cd /mnt/hgfs/shared/hw4
+rm -f snake.o
+make
+insmod snake.o max_games=10
+major=`grep "SNAKE GAME" /proc/devices | cut -d" " -f1`
+cd /dev/
+rm -f MAX
+mknod MAX c $major 0
+cd /mnt/hgfs/shared/hw4
