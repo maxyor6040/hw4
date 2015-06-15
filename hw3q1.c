@@ -4,6 +4,7 @@ Include files:
 //#include <stdio.h>
 //#include <stdlib.h>
 //#include <time.h>
+#include <linux/mm.h>
 #include <asm/ioctl.h> //CHANGE
 /*=========================================================================
 Constants and definitions:
@@ -50,10 +51,33 @@ typedef int ErrorCode;
 #define ERR_BOARD_FULL			((ErrorCode)-1)
 #define ERR_SNAKE_IS_TOO_HUNGRY ((ErrorCode)-2)
 
+
+
+//CHANGE
+#include <linux/random.h>
+typedef struct semaphore Semaphore;
+
+typedef struct game_t {
+	Matrix board;
+	Semaphore globalLock;
+	Semaphore whiteMoves;
+	Semaphore blackMoves;
+	int someoneLeft;
+	int countOpens;
+	int Winner;
+} game;
+
+typedef struct privateGameData_t {
+	game* myGame;
+	int color;
+} privateGameData;
+//END CHANGE
+
+void my_printf(char* str,int strLength, char **buf, int* count);
 bool Init(Matrix*); /* initialize the board. return false if the board is illegal (should not occur, affected by N, M parameters) */
-bool Update(Matrix*, Player);/* handle all updating to this player. returns whether to continue or not. */
-void Print(Matrix*);/* prints the state of the board */
-Point GetInputLoc(Matrix*, Player);/* calculates the location that the player wants to go to */
+bool Update(Matrix *matrix, Player player, privateGameData* PGD, char move);/* handle all updating to this player. returns whether to continue or not. */
+void Print(Matrix *matrix, char *buf, int count);/* prints the state of the board */
+Point GetInputLoc(Matrix *matrix, Player player, char move);/* calculates the location that the player wants to go to */
 bool CheckTarget(Matrix*, Player, Point);/* checks if the player can move to the specified location */
 Point GetSegment(Matrix*, int);/* gets the location of a segment which is numbered by the value */
 bool IsAvailable(Matrix*, Point);/* returns if the point wanted is in bounds and not occupied by any snake */
@@ -272,10 +296,12 @@ ErrorCode RandFoodLocation(Matrix *matrix)
 	int i=0;
 	do
 	{
-		p.x = get_random_bytes(&i, sizeof(int)) % N;
-		p.y = get_random_bytes(&i, sizeof(int)) % N;
+		get_random_bytes(&p.x, sizeof(int));
+		p.x %= N;
+		get_random_bytes(&p.y, sizeof(int));
+		p.y %= N;
 		++i;
-	} while (!IsAvailable(matrix, p) || IsMatrixFull(matrix));
+	} while (!(IsAvailable(matrix, p) || IsMatrixFull(matrix)));
 
 	if (IsMatrixFull(matrix))
 		return ERR_BOARD_FULL;
@@ -297,10 +323,11 @@ bool IsMatrixFull(Matrix *matrix)
 	}
 	return TRUE;
 }
-
+/* shit we did
 void Print(Matrix *matrix, char *buf, int count) {
 	int i;
 	Point p;
+    char ccc;
 	for (i = 0; i < N + 1; ++i)
 		my_printf("---", 3, buf, &count);
 	my_printf("\n", 1, buf, &count);
@@ -315,9 +342,13 @@ void Print(Matrix *matrix, char *buf, int count) {
 					my_printf("  .", 3, buf, &count);
 					break;
 				default:
-					my_printf(((*matrix)[p.y][p.x]) / 100, 1, buf, &count);
-					my_printf((unsigned int) ((((*matrix)[p.y][p.x]) / 10) % 10), 1, buf, &count);
-					my_printf((unsigned int) ((*matrix)[p.y][p.x]) % 10, 1, buf, &count);
+
+					sprintf(&ccc, "%d", (((*matrix)[p.y][p.x]) / 100));
+					my_printf(&ccc, 1, buf, &count);
+                    sprintf(&ccc, "%d", ((((*matrix)[p.y][p.x]) / 10) % 10));
+                    my_printf(&ccc, 1, buf, &count);
+                    sprintf(&ccc, "%d", ((*matrix)[p.y][p.x]) % 10);
+                    my_printf(&ccc, 1, buf, &count);
 			}
 		}
 		my_printf(" |\n", 3, buf, &count);
@@ -325,11 +356,9 @@ void Print(Matrix *matrix, char *buf, int count) {
 	for (i = 0; i < N + 1; ++i)
 		my_printf("---", 3, buf, &count);
 	my_printf("\n", 1, buf, &count);
-	/* DEAN CHANGES */
 	while (count > 0){
 		my_printf("\0", 1, buf, &count);
 	}
-	/* END OF DEAN CHANGES */
 }
 
 void my_printf(char* str, int strLen, char *buf, int* count){
@@ -342,4 +371,66 @@ void my_printf(char* str, int strLen, char *buf, int* count){
 		*count -= strLen;
 	}
 	copy_to_user((void*)buf,(void*)str, x);
+}
+*/
+
+
+void Print(Matrix *matrix, char *real_buf, int count)
+{
+	char** buf = &real_buf;
+	int i;
+	Point p;
+	char* strBuff = kmalloc(sizeof(char)*10,GFP_KERNEL);
+	for (i = 0; i < N + 1; ++i) {
+		sprintf(strBuff, "---");
+		my_printf(strBuff, 3, buf, &count);
+	}
+
+	sprintf(strBuff, "\n");
+	my_printf(strBuff, 1, buf, &count);
+	for (p.y = 0; p.y < N; ++p.y)
+	{
+		sprintf(strBuff, "|");
+		my_printf(strBuff, 1, buf, &count);
+		for (p.x = 0; p.x < N; ++p.x)
+		{
+			switch ((*matrix)[p.y][p.x])
+			{
+				case FOOD:
+					sprintf(strBuff, "  *");
+					my_printf(strBuff, 3, buf, &count);
+					break;
+				case EMPTY:
+					sprintf(strBuff, "  .");
+					my_printf(strBuff, 3, buf, &count);
+					break;
+				default:
+					sprintf(strBuff, "% 3d", (*matrix)[p.y][p.x]);
+					my_printf(strBuff, 3, buf, &count);
+			}
+		}
+		sprintf(strBuff, " |\n");
+		my_printf(strBuff, 3, buf, &count);
+	}
+	for (i = 0; i < N + 1; ++i) {
+		sprintf(strBuff, "---");
+		my_printf(strBuff, 3, buf, &count);
+	}
+	sprintf(strBuff, "\n");
+	my_printf(strBuff, 1, buf, &count);
+	//fill buffer with \0
+	*strBuff='\0';
+	for( i = 0 ; i < count ; i++){
+		my_printf(strBuff, 1, buf, &count);
+	}
+	kfree(strBuff);
+}
+
+void my_printf(char* str,int strLength, char **buf, int* count) {
+	if(*count<=0){
+		return;
+	}
+	copy_to_user((void*)(*buf),(void*)str, strLength);
+	*buf += strLength;
+	count-=strLength;
 }

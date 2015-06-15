@@ -32,7 +32,7 @@ int init_module( void );
 void cleanup_module( void );
 int my_open( struct inode *inode, struct file *filp );
 int my_release( struct inode *inode, struct file *filp );
-int my_llseek(struct file *filp , loff_t loffT, int off);
+loff_t my_llseek(struct file *, loff_t, int);
 ssize_t my_read( struct file *filp, char *buf, size_t count, loff_t *f_pos );
 ssize_t my_write(struct file *filp, const char *buf, size_t count, loff_t *f_pos);
 ssize_t my_read2( struct file *filp, char *buf, size_t count, loff_t *f_pos );
@@ -44,14 +44,13 @@ struct file_operations my_fops = {
         .release=	my_release,
         .read=		my_read,
         .write=		my_write,
-        .llseek=		my_llseek,
+        .llseek=    my_llseek,
         .flush=		NULL,
         .ioctl=		my_ioctl,
         .owner=		THIS_MODULE,
 };
 
-typedef struct semaphore Semaphore;
-
+/*
 typedef struct game_t {
     Matrix board;
     Semaphore globalLock;
@@ -66,7 +65,7 @@ typedef struct privateGameData_t {
     game* myGame;
     int color;
 } privateGameData;
-
+*/
 
 game Games[256];
 
@@ -102,23 +101,22 @@ int my_open( struct inode *inode, struct file *filp ) {
     int i = MINOR( inode->i_rdev );
     down(&(Games[i].globalLock));
     Games[i].countOpens++;
-    privateGameData* PGD;
     if(Games[i].countOpens == 1){//WHITE player
-        privateGameData* PGD=kmalloc(sizeof(*PGD), GPF_KERNEL);
-        PGD->color=WHITE;
-        PGD->myGame = Games+i;
-        filp->private_data = (void*)PGD;
-        Init(PGD->myGame->board, i);
+        privateGameData* PGD1=kmalloc(sizeof(*PGD1), GFP_KERNEL);
+        PGD1->color=WHITE;
+        PGD1->myGame = Games+i;
+        filp->private_data = (void*)PGD1;
+        Init(&(PGD1->myGame->board));
         up(&(Games[i].globalLock));
-        down(&PGD->myGame->whiteMoves);
-        up(&PGD->myGame->whiteMoves);
+        down(&PGD1->myGame->whiteMoves);
+        up(&PGD1->myGame->whiteMoves);
     }else if(Games[i].countOpens == 2){//BLACK player
         up(&(Games[i].globalLock));
-        privateGameData* PGD=kmalloc(sizeof(*PGD), GPF_KERNEL);
-        PGD->color=BLACK;
-        PGD->myGame = Games+i;
-        filp->private_data = (void*)PGD;
-        up(&PGD->myGame->whiteMoves);
+        privateGameData* PGD2=kmalloc(sizeof(*PGD2), GFP_KERNEL);
+        PGD2->color=BLACK;
+        PGD2->myGame = Games+i;
+        filp->private_data = (void*)PGD2;
+        up(&PGD2->myGame->whiteMoves);
     }else{//third or above entrence to my_open
         up(&(Games[i].globalLock));
         //TODO: send error
@@ -137,22 +135,32 @@ int my_release( struct inode *inode, struct file *filp ) {
     return 0;
 }
 
-int my_llseek(struct file *filp , loff_t loffT, int off){
- return -ENOSYS;
+loff_t my_llseek(struct file *filp, loff_t loff, int off){
+    return -ENOSYS;
 }
 
 ssize_t my_read( struct file *filp, char *buf, size_t count, loff_t *f_pos ) {
+    //printk("\n~1~\n");
     privateGameData* PGD = (privateGameData*)filp->private_data;
+    //printk("\n~2~\n");
     down(&PGD->myGame->globalLock);
+    //printk("\n~3~\n");
     if (PGD->myGame->someoneLeft == TRUE || PGD->myGame->Winner!=0){
+        //printk("\n~4~\n");
         up(&PGD->myGame->whiteMoves);
+        //printk("\n~5~\n");
         up(&PGD->myGame->blackMoves);
+        //printk("\n~6~\n");
         up(&PGD->myGame->globalLock);
+        //printk("\n~7~\n");
         // TODO: returning appropriate error
     }
     /* DEAN CHANGES */
+    //printk("\n~8~\n");
     Print(&PGD->myGame->board,buf,count);
+    //printk("\n~9~\n");
     up(&PGD->myGame->globalLock);
+    //printk("\n~10~\n");
     /* END OF DEAN CHANGES */
 
     //read the data
@@ -186,7 +194,7 @@ ssize_t my_write(struct file *filp, const char *buf, size_t count, loff_t *f_pos
         PGD->myGame->Winner = -(PGD->color);
         return 0;//TODO return error
     }
-    Update(PGD->myGame->board, PGD->color, privateGameData* PGD, move);
+    Update(&PGD->myGame->board, PGD->color, PGD, move);
 
     if (PGD->color == WHITE){
         up(&PGD->myGame->blackMoves);
@@ -218,7 +226,7 @@ int my_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned 
                 up(&PGD->myGame->globalLock);
                 return 2;
             }
-            if (PPGD->myGame->Winner == TIE)
+            if (PGD->myGame->Winner == TIE)
             {
                 up(&PGD->myGame->globalLock);
                 return 5;
@@ -257,4 +265,8 @@ int my_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned 
     /* END OF DEAN CHANGES */
     return 0;
 }
+
+
+
+
 
