@@ -1,0 +1,12 @@
+#!/bin/bash
+for (( c=0; c<=50; c++ ))
+do
+ rm -f /dev/snake$c
+done
+insmod ./snake.o max_games=50
+for (( c=0; c<=50; c++ ))
+do
+ mknod /dev/snake$c c 254 $c
+done
+
+
